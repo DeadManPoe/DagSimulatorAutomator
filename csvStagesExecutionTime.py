@@ -11,7 +11,8 @@ class Parser:
         self.fileValidation(jobsFile)
         self.fileValidation(stagesFile)
         self.parseJobs()
-        self.orderStages()
+        f = open(stagesFile, "r")
+        self.stagesRows = self.orderStages(csv.DictReader(f))
         self.parseStages()
 
     def fileValidation(self,filename):
@@ -28,11 +29,8 @@ class Parser:
                 self.parseStageList(row["Job ID"],stageIds)
         f.close()
 
-    def orderStages(self):
-        f = open(self.stagesFile, "r")
-        stagesReader = csv.DictReader(f)
-        self.stagesRows = sorted(stagesReader, key = lambda x: x["Stage ID"])
-        f.close()
+    def orderStages(self,stages):
+        return sorted(stages, key = lambda x: x["Stage ID"])
 
     def parseStages(self):
         batch = []
@@ -50,6 +48,7 @@ class Parser:
         stages = stageIds[1:len(stageIds)-1].split(", ")
         for stage in stages:
             self.stagesJobMap[stage]=jobId
+
 def main():
     args = sys.argv
     if len(args) != 3:
