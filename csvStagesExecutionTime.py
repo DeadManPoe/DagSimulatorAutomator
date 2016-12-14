@@ -3,9 +3,9 @@ import sys
 import os
 
 class Parser:
-    def __init__(self, jobsFile,stagesFile,stagesRelfile):
-        self.targetDirectory=''
-        self.stagesJobMap = {}
+    def __init__(self, jobsFile,stagesFile,stagesRelfile,targetDirectory):
+        self.targetDirectory= targetDirectory
+        self.stageJobMap = {}
         self.jobStageMap = {}
         self.stagesRows = []
         self.jobs = []
@@ -13,11 +13,11 @@ class Parser:
         self.stagesRelFile = stagesRelfile
         self.stagesFile = stagesFile
         map(lambda x: self.fileValidation(x),[jobsFile,stagesFile, stagesRelfile])
-        self.fileValidation(stagesFile)
         self.parseJobs()
         f = open(stagesFile, "r")
         self.stagesRows = self.orderStages(csv.DictReader(f))
-        self.parseStages()
+        f.close()
+        self.buildTimeFiles()
         self.buildOutputString()
 
     def fileValidation(self,filename):
@@ -31,39 +31,39 @@ class Parser:
         for row in jobsReader:
             stageIds = row["Stage IDs"]
             jobId = row["Job ID"]
-            if(stageIds!= "NOVAL"):
-                self.parseStageList(jobId,stageIds)
-                self.jobs.append({"job_id":jobId, "stages":stageIds[1:len(stageIds)-1].split(", ")})
+            if(stageIds != "NOVAL"):
+                stagesList = self.parseStagesList(stageIds)
+                for stage in stagesList:
+                    self.stageJobMap[stage]=jobId
+                self.jobs.append({"job_id":jobId, "stages":self.parseStagesList(stageIds)})
         f.close()
 
     def orderStages(self,stages):
         return sorted(stages, key = lambda x: x["Stage ID"])
 
-    def parseStages(self):
+    def parseStagesList(self,stagesList):
+        return stagesList[1:len(stagesList)-1].split(", ")
+
+    def buildTimeFiles(self):
         batch = []
         lastRow = None
         for row in self.stagesRows:
             if((lastRow != None and lastRow["Stage ID"] != row["Stage ID"])):
-                f = open("./tmp_output/J"+self.stagesJobMap[lastRow["Stage ID"]]+"S"+lastRow["Stage ID"]+".txt","w")
+                f = open("./tmp_output/J"+self.stageJobMap[lastRow["Stage ID"]]+"S"+lastRow["Stage ID"]+".txt","w")
                 f.write(", ".join(batch))
                 f.close()
                 batch = []
             batch.append(row["Executor Run Time"])
             lastRow = row
 
-    def parseStageList(self, jobId, stageIds):
-        stages = stageIds[1:len(stageIds)-1].split(", ")
-        for stage in stages:
-            self.stagesJobMap[stage]=jobId
-
-    def reconstructRel(self):
+    def stagesRel(self):
         f = open(self.stagesRelFile,"r")
         rows = self.orderStages(csv.DictReader(f))
         stagesMap = {}
         for row in rows:
             parentIds = row["Parent IDs"]
             stageId = row["Stage ID"]
-            parents = parentIds[1:len(parentIds)-1].split(", ")
+            parents = self.parseStagesList(parentIds)
             if(len(parents)== 1 and parents[0] == ''):
                 parents = []
             stagesMap[stageId]= {
@@ -77,12 +77,11 @@ class Parser:
 
         return stagesMap
 
-    def perJobReconstructRel(self):
-        stagesMap = self.reconstructRel()
+    def perJobStagesRel(self):
+        stagesMap = self.stagesRel()
         tmpFirst = []
         tmpLast = []
         newMap = []
-        sortedMap = {}
         sortedJobs = sorted(self.jobs, key=lambda x: x["job_id"])
         maxJob = sortedJobs[len(sortedJobs)-1]["job_id"]
         for job in sortedJobs:
@@ -111,11 +110,11 @@ class Parser:
         return(stagesMap)
 
     def buildOutputString(self):
-        stagesMap = self.perJobReconstructRel()
+        stagesDict = self.perJobStagesRel()
         targetString = ''
-        for key,value in stagesMap.iteritems():
-            namedParents = map(lambda x: stagesMap[x]["name"], value["parents"])
-            namedChildren = map(lambda x: stagesMap[x]["name"], value["children"])
+        for key,value in stagesDict.iteritems():
+            namedParents = map(lambda x: stagesDict[x]["name"], value["parents"])
+            namedChildren = map(lambda x: stagesDict[x]["name"], value["children"])
             namedParents = reduce(lambda accumul, current: accumul+'"'+current+'",',namedParents, '' )
             namedChildren = reduce(lambda accumul, current: accumul+'"'+current+'",',namedChildren, '' )
             if(namedParents!=''):
@@ -132,11 +131,11 @@ class Parser:
 
 def main():
     args = sys.argv
-    if len(args) != 4:
-        print("Required args: [JOBS_FILE_CSV] [STAGE_FILE_CSV] [STAGE_REL_FILE_CSV]")
+    if len(args) != 5:
+        print("Required args: [JOBS_FILE_CSV] [STAGE_FILE_CSV] [STAGE_REL_FILE_CSV] [DIRECTORY_FOR_OUTPUTTED_STRING]")
         exit(-1)
     else:
-        parser = Parser(str(args[1]),str(args[2]),str(args[3]))
+        parser = Parser(str(args[1]),str(args[2]),str(args[3]),str(args[4])+'/')
 
 if(__name__=="__main__"):
     main()
