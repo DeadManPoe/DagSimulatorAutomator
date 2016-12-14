@@ -39,7 +39,7 @@ class Parser:
         lastRow = None
         for row in self.stagesRows:
             if((lastRow != None and lastRow["Stage ID"] != row["Stage ID"])):
-                f = open("./tmp_output/"+self.stagesJobMap[lastRow["Stage ID"]]+"_"+lastRow["Stage ID"]+".txt","w")
+                f = open("./tmp_output/J"+self.stagesJobMap[lastRow["Stage ID"]]+"S"+lastRow["Stage ID"]+".txt","w")
                 f.write(", ".join(batch))
                 f.close()
                 batch = []
