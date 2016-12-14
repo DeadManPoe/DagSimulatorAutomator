@@ -3,23 +3,22 @@ import sys
 import os
 
 class Parser:
-    def __init__(self, jobsFile,stagesFile,stagesRel):
+    def __init__(self, jobsFile,stagesFile,stagesRelfile):
+        self.targetDirectory=''
         self.stagesJobMap = {}
         self.jobStageMap = {}
         self.stagesRows = []
         self.jobs = []
         self.jobsFile = jobsFile
-        self.stagesRelFile = stagesRel
+        self.stagesRelFile = stagesRelfile
         self.stagesFile = stagesFile
-        self.fileValidation(jobsFile)
+        map(lambda x: self.fileValidation(x),[jobsFile,stagesFile, stagesRelfile])
         self.fileValidation(stagesFile)
         self.parseJobs()
-
-        #f = open(stagesFile, "r")
-        #self.stagesRows = self.orderStages(csv.DictReader(f))
-        #self.parseStages()
-        #self.reconstructRel()
-        self.perJobReconstructRel()
+        f = open(stagesFile, "r")
+        self.stagesRows = self.orderStages(csv.DictReader(f))
+        self.parseStages()
+        self.buildOutputString()
 
     def fileValidation(self,filename):
         if not(os.path.exists(filename)):
@@ -65,11 +64,13 @@ class Parser:
             parentIds = row["Parent IDs"]
             stageId = row["Stage ID"]
             parents = parentIds[1:len(parentIds)-1].split(", ")
-            if(len(parents)==1 and parents[0] == ''):
+            if(len(parents)== 1 and parents[0] == ''):
                 parents = []
             stagesMap[stageId]= {
                 "parents": parents,
-                "children": []
+                "children": [],
+                "tasks": row["Number of Tasks"],
+                "name": "S"+stageId
             }
             for parent in parents:
                 stagesMap[parent]["children"].append(stageId)
@@ -86,6 +87,7 @@ class Parser:
         maxJob = sortedJobs[len(sortedJobs)-1]["job_id"]
         for job in sortedJobs:
             for stage in job["stages"]:
+                stagesMap[stage]["name"] = "J"+job["job_id"]+stagesMap[stage]["name"]
                 if(len(stagesMap[stage]["children"])==0):
                     tmpLast.append(stage)
                 if(len(stagesMap[stage]["parents"])==0):
@@ -106,7 +108,25 @@ class Parser:
                         stagesMap[stage_1]["parents"].append(stage)
                         stagesMap[stage]["children"].append(stage_1)
 
-        print(stagesMap)
+        return(stagesMap)
+
+    def buildOutputString(self):
+        stagesMap = self.perJobReconstructRel()
+        targetString = ''
+        for key,value in stagesMap.iteritems():
+            namedParents = map(lambda x: stagesMap[x]["name"], value["parents"])
+            namedChildren = map(lambda x: stagesMap[x]["name"], value["children"])
+            namedParents = reduce(lambda accumul, current: accumul+'"'+current+'",',namedParents, '' )
+            namedChildren = reduce(lambda accumul, current: accumul+'"'+current+'",',namedChildren, '' )
+            if(namedParents!=''):
+                namedParents = namedParents[:len(namedParents)-1]
+            if(namedChildren!=''):
+                namedChildren = namedChildren[:len(namedChildren)-1]
+            targetString+='{ name="'+value["name"]+'", tasks="'+value["tasks"]+'"'
+            targetString+=', dist={type="replay", params={samples=solver.fileToArray("'+self.targetDirectory+value["name"]+'.txt")}}'
+            targetString+=', pre={'+namedParents+'}, post={'+namedChildren+'}},'
+        targetString = '{'+targetString[:len(targetString)-1]+'}'
+        print(targetString)
 
 
 
