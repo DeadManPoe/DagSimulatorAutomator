@@ -27,3 +27,4 @@ Temporary Items
 
 tmp_output/*
 !tmp_output/.gitkeep
+tmp_test/*
