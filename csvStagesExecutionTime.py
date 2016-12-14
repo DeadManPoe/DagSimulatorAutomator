@@ -42,7 +42,6 @@ class Parser:
                 f = open("./tmp_output/"+self.stagesJobMap[lastRow["Stage ID"]]+"_"+lastRow["Stage ID"]+".txt","w")
                 f.write(", ".join(batch))
                 f.close()
-                print(len(batch))
                 batch = []
             batch.append(row["Executor Run Time"])
             lastRow = row
