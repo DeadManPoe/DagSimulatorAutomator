@@ -24,3 +24,6 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+tmp_output/*
+!tmp_output/.gitkeep
