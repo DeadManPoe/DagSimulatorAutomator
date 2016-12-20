@@ -10,16 +10,18 @@ class Parser:
         self.stagesRows = []
         self.jobs = []
         self.jobsTemporalMap = {}
+        self.superMap = {}
         self.jobsFile = jobsFile
         self.stagesRelFile = stagesRelfile
         self.stagesFile = stagesFile
         map(lambda x: self.fileValidation(x),[jobsFile,stagesFile, stagesRelfile])
         self.parseJobs()
-        f = open(stagesFile, "r")
-        self.stagesRows = self.orderStages(csv.DictReader(f))
-        f.close()
-        self.buildTimeFiles()
-        self.buildOutputString()
+        self.buildJobsHierachy()
+        #f = open(stagesFile, "r")
+        #self.stagesRows = self.orderStages(csv.DictReader(f))
+        #f.close()
+        #self.buildTimeFiles()
+        #self.buildOutputString()
 
     def fileValidation(self,filename):
         if not(os.path.exists(filename)):
@@ -55,6 +57,61 @@ class Parser:
 
     def parseStagesList(self,stagesList):
         return stagesList[1:len(stagesList)-1].split(", ")
+
+    def buildJobsHierachy(self):
+        hierarchy = {}
+        for key,value in self.jobsTemporalMap.iteritems():
+            for key_1, value_1 in self.jobsTemporalMap.iteritems():
+                if(value["completionTime"] < value_1["submissionTime"] and key != key_1):
+                    try:
+                        hierarchy[key]["followers"].append(key_1)
+                    except KeyError:
+                        hierarchy[key] = {
+                            "followers" : [key_1],
+                            "parents" : []
+                        }
+                    try:
+                        hierarchy[key_1]["parents"].append(key)
+                    except KeyError:
+                        hierarchy[key_1] = {
+                            "followers" : [],
+                            "parents" : [key]
+                        }
+        jobFixingMap = {}
+        for key,value in hierarchy.iteritems():
+            print(key)
+            target = []
+            sort = sorted(value["parents"], key=lambda x: self.jobsTemporalMap[key]["submissionTime"] - self.jobsTemporalMap[x]["completionTime"])
+            print(sort)
+            if(len(sort) != 0):
+                target.append(sort[0])
+            self.recurrParent(sort,hierarchy,target)
+            jobFixingMap[key] = {
+                "parents" : target,
+                "followers" : []
+            }
+        self.buildChildren(jobFixingMap)
+        self.superMap = jobFixingMap
+
+
+
+    def buildChildren(self,jobFixingMap):
+        for key,value in jobFixingMap.iteritems():
+            for key_1, value_1 in jobFixingMap.iteritems():
+                if(key != key_1 and key in value_1["parents"]):
+                    value["followers"].append(key_1)
+
+    def recurrParent(self,sort,hierarchy,target):
+        counter = 0
+        for index, value in enumerate(sort):
+            if(index != 0):
+                for index_1, value_1 in enumerate(sort[:index]):
+                    if(value not in hierarchy[sort[index_1]]["parents"]):
+                        counter=counter+1
+                if(counter == len(sort[:index])):
+                    target.append(value)
+                counter = 0
+
 
     def buildTimeFiles(self):
         batch = []
