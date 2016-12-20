@@ -6,12 +6,8 @@ class Parser:
     def __init__(self, jobsFile,stagesFile,stagesRelfile,targetDirectory):
         self.targetDirectory= targetDirectory
         self.stageJobMap = {}
-        self.jobStageMap = {}
         self.stagesRows = []
         self.jobsMap = {}
-        self.jobs = []
-        self.jobsTemporalMap = {}
-        self.superMap = {}
         self.jobsFile = jobsFile
         self.stagesRelFile = stagesRelfile
         self.stagesFile = stagesFile
@@ -24,11 +20,14 @@ class Parser:
         self.buildTimeFiles()
         self.buildOutputString()
 
+
+    """Checks the existence of the given file path"""
     def fileValidation(self,filename):
         if not(os.path.exists(filename)):
             print("The file "+filename+" does not exists")
             exit(-1)
 
+    """Reads jobs records from a csv file and builds a dict based upon them"""
     def parseJobs(self):
         jobs = {}
         f = open(self.jobsFile,"r")
@@ -62,6 +61,8 @@ class Parser:
     def parseStagesList(self,stagesList):
         return stagesList[1:len(stagesList)-1].split(", ")
 
+    """Builds a simple hierarchy among job based on the fact that
+    a job is considered a parent of another one if it finishes before the start of the other one"""
     def buildJobHierarchy(self):
         for key,value in self.jobsMap.iteritems():
             for key_1, value_1 in self.jobsMap.iteritems():
@@ -71,6 +72,7 @@ class Parser:
         self.buidlComplexJobHierarchy()
         self.decorateWithFollowers(self.jobsMap)
 
+    """Builds a complex job hierarchy from a simple one"""
     def buidlComplexJobHierarchy(self):
         counter = 0
         tmp = []
@@ -105,6 +107,7 @@ class Parser:
                 if(key != key_1 and key in value_1["parents"]):
                     value["followers"].append(key_1)
 
+    """Builds .txt files containing the execution time of each task in a stage"""
     def buildTimeFiles(self):
         batch = []
         lastRow = None
@@ -117,6 +120,8 @@ class Parser:
             batch.append(row["Executor Run Time"])
             lastRow = row
 
+    """Builds parent-child dependencies among stages in the context
+    of a single job"""
     def stagesRel(self):
         f = open(self.stagesRelFile,"r")
         rows = self.orderStages(csv.DictReader(f))
@@ -138,12 +143,14 @@ class Parser:
 
         return stagesMap
 
+    """Builds parent-child dependencies among stages considering the
+    parent-child dependencies among jobs"""
     def perJobStagesRel(self):
         stagesMap = self.stagesRel()
         tmpFirst = []
         tmpLast = []
         newMap = []
-        #For each job retrieve the first stages and the last stages
+        """For each job retrieve the first stages and the last stages"""
         for key,job in self.jobsMap.iteritems():
             for stage in job["stages"]:
                 stagesMap[stage]["name"] = "J"+key+stagesMap[stage]["name"]
@@ -156,6 +163,11 @@ class Parser:
             tmpLast = []
             tmpFirst = []
 
+        """For each job look at the last stages of that job, and for each
+        of them consider the jobs that follows the current one, and for each
+        of these jobs, consider their first stages, then express that the last stages
+        of the current job are the parent of the first stages of the current child job
+        and the contrary"""
         for key, job in self.jobsMap.iteritems():
             for stage in job["last"]:
                 for next_job in job["followers"]:
