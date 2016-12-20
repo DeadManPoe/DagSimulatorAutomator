@@ -55,9 +55,11 @@ class Parser:
                 self.jobsMap[jobId]["completionTime"] = int(completionTime)
         f.close()
 
+    """Orders the stages dict by 'Stage Id'"""
     def orderStages(self,stages):
         return sorted(stages, key = lambda x: x["Stage ID"])
 
+    """Splits correctly a list of stages"""
     def parseStagesList(self,stagesList):
         return stagesList[1:len(stagesList)-1].split(", ")
 
@@ -100,7 +102,8 @@ class Parser:
             tmp = []
 
 
-
+    """From a map in which each node contains just a 'parents' field,
+    decoretes such nodes with a proper 'followers' field"""
     def decorateWithFollowers(self,jobsMap):
         for key,value in jobsMap.iteritems():
             for key_1, value_1 in jobsMap.iteritems():
@@ -176,6 +179,8 @@ class Parser:
                         stagesMap[stage]["children"].append(stage_1)
         return stagesMap
 
+    """Builds a string to be passed to the DAGSimulator that represents
+    the hierarchies among stages created with the other methods"""
     def buildOutputString(self):
         stagesDict = self.perJobStagesRel()
         targetString = ''
