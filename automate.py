@@ -17,12 +17,12 @@ class Parser:
         self.stagesFile = stagesFile
         map(lambda x: self.fileValidation(x),[jobsFile,stagesFile, stagesRelfile])
         self.parseJobs()
-        self.buildSimpleJobHierarchy()
-        #f = open(stagesFile, "r")
-        #self.stagesRows = self.orderStages(csv.DictReader(f))
-        #f.close()
-        #self.buildTimeFiles()
-        #self.buildOutputString()
+        self.buildJobHierarchy()
+        f = open(stagesFile, "r")
+        self.stagesRows = self.orderStages(csv.DictReader(f))
+        f.close()
+        self.buildTimeFiles()
+        self.buildOutputString()
 
     def fileValidation(self,filename):
         if not(os.path.exists(filename)):
@@ -62,14 +62,14 @@ class Parser:
     def parseStagesList(self,stagesList):
         return stagesList[1:len(stagesList)-1].split(", ")
 
-    def buildSimpleJobHierarchy(self):
+    def buildJobHierarchy(self):
         for key,value in self.jobsMap.iteritems():
             for key_1, value_1 in self.jobsMap.iteritems():
                 if(value["completionTime"] < value_1["submissionTime"] and key != key_1):
                     self.jobsMap[key_1]["parents"].append(key)
 
         self.buidlComplexJobHierarchy()
-        print(self.jobsMap)
+        self.decorateWithFollowers(self.jobsMap)
 
     def buidlComplexJobHierarchy(self):
         counter = 0
@@ -99,9 +99,9 @@ class Parser:
 
 
 
-    def buildChildren(self,jobFixingMap):
-        for key,value in jobFixingMap.iteritems():
-            for key_1, value_1 in jobFixingMap.iteritems():
+    def decorateWithFollowers(self,jobsMap):
+        for key,value in jobsMap.iteritems():
+            for key_1, value_1 in jobsMap.iteritems():
                 if(key != key_1 and key in value_1["parents"]):
                     value["followers"].append(key_1)
 
@@ -143,33 +143,26 @@ class Parser:
         tmpFirst = []
         tmpLast = []
         newMap = []
-        sortedJobs = sorted(self.jobs, key=lambda x: x["job_id"])
-        maxJob = sortedJobs[len(sortedJobs)-1]["job_id"]
         #For each job retrieve the first stages and the last stages
-        for job in sortedJobs:
+        for key,job in self.jobsMap.iteritems():
             for stage in job["stages"]:
-                stagesMap[stage]["name"] = "J"+job["job_id"]+stagesMap[stage]["name"]
+                stagesMap[stage]["name"] = "J"+key+stagesMap[stage]["name"]
                 if(len(stagesMap[stage]["children"])==0):
                     tmpLast.append(stage)
                 if(len(stagesMap[stage]["parents"])==0):
                     tmpFirst.append(stage)
-            newMap.append({
-                "job_id" : job["job_id"],
-                "stages" : job["stages"],
-                "last": tmpLast,
-                "first": tmpFirst
-            })
+            job["last"] = tmpLast
+            job["first"] = tmpFirst
             tmpLast = []
             tmpFirst = []
 
-        for i,job in enumerate(newMap):
-            if(job["job_id"] != maxJob):
-                for stage in job["last"]:
-                    for stage_1 in newMap[i+1]["first"]:
+        for key, job in self.jobsMap.iteritems():
+            for stage in job["last"]:
+                for next_job in job["followers"]:
+                    for stage_1 in self.jobsMap[next_job]["first"]:
                         stagesMap[stage_1]["parents"].append(stage)
                         stagesMap[stage]["children"].append(stage_1)
-
-        return(stagesMap)
+        return stagesMap
 
     def buildOutputString(self):
         stagesDict = self.perJobStagesRel()
