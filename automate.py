@@ -9,6 +9,7 @@ class Parser:
         self.jobStageMap = {}
         self.stagesRows = []
         self.jobs = []
+        self.jobsTemporalMap = {}
         self.jobsFile = jobsFile
         self.stagesRelFile = stagesRelfile
         self.stagesFile = stagesFile
@@ -26,16 +27,32 @@ class Parser:
             exit(-1)
 
     def parseJobs(self):
+        jobs = {}
         f = open(self.jobsFile,"r")
         jobsReader = csv.DictReader(f)
         for row in jobsReader:
             stageIds = row["Stage IDs"]
             jobId = row["Job ID"]
+            completionTime = row["Completion Time"]
+            submissionTime = row["Submission Time"]
+            if(submissionTime != "NOVAL"):
+                try:
+                    self.jobsTemporalMap[jobId]["submissionTime"] = int(submissionTime)
+                except KeyError:
+                    self.jobsTemporalMap[jobId] = {
+                        "submissionTime" : 0,
+                        "completionTime" : 0
+                    }
+            if(completionTime != "NOVAL"):
+                self.jobsTemporalMap[jobId]["completionTime"] = int(completionTime)
+
+
             if(stageIds != "NOVAL"):
                 stagesList = self.parseStagesList(stageIds)
                 for stage in stagesList:
                     self.stageJobMap[stage]=jobId
                 self.jobs.append({"job_id":jobId, "stages":self.parseStagesList(stageIds)})
+        print(self.jobsTemporalMap)
         f.close()
 
     def orderStages(self,stages):
@@ -84,6 +101,7 @@ class Parser:
         newMap = []
         sortedJobs = sorted(self.jobs, key=lambda x: x["job_id"])
         maxJob = sortedJobs[len(sortedJobs)-1]["job_id"]
+        #For each job retrieve the first stages and the last stages
         for job in sortedJobs:
             for stage in job["stages"]:
                 stagesMap[stage]["name"] = "J"+job["job_id"]+stagesMap[stage]["name"]
