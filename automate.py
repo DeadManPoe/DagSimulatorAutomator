@@ -36,23 +36,18 @@ class Parser:
             completionTime = row["Completion Time"]
             submissionTime = row["Submission Time"]
             if(submissionTime != "NOVAL"):
-                try:
-                    self.jobsTemporalMap[jobId]["submissionTime"] = int(submissionTime)
-                except KeyError:
-                    self.jobsTemporalMap[jobId] = {
-                        "submissionTime" : 0,
-                        "completionTime" : 0
-                    }
+                self.jobsTemporalMap[jobId] = {
+                    "submissionTime" : int(submissionTime),
+                    "completionTime" : 0
+                }
             if(completionTime != "NOVAL"):
                 self.jobsTemporalMap[jobId]["completionTime"] = int(completionTime)
-
 
             if(stageIds != "NOVAL"):
                 stagesList = self.parseStagesList(stageIds)
                 for stage in stagesList:
                     self.stageJobMap[stage]=jobId
                 self.jobs.append({"job_id":jobId, "stages":self.parseStagesList(stageIds)})
-        print(self.jobsTemporalMap)
         f.close()
 
     def orderStages(self,stages):
